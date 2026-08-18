@@ -1,5 +1,5 @@
 """NBLM — FastAPI Application Entry Point."""
-import logging
+import logging, os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.config import settings
 from backend.db.engine import get_db
 from backend.harness.loop import AgentLoop
+from backend.routes.upload import router as upload_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("nblm")
@@ -18,7 +19,13 @@ async def lifespan(app: FastAPI):
     logger.info("NBLM shutting down")
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=settings.CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
+
+# CORS: allow all origins for production (Render + CF Pages)
+cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+app.add_middleware(CORSMiddleware, allow_origins=cors_origins, allow_methods=["*"], allow_headers=["*"])
+
+# Include routers
+app.include_router(upload_router)
 
 @app.post("/api/chat")
 async def chat(body: dict, db: AsyncSession = Depends(get_db)):
